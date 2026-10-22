@@ -321,6 +321,52 @@ def search_codebase(pattern: str, path: str = ".", file_glob: str = "") -> str:
     except Exception as e:
         return f"Search execution failed: {str(e)}"
 
+def deploy_circuitpython_code(code_content: str, volume_path: str = "/Volumes/CIRCUITPY") -> str:
+    """Safely deploys Python source code to a mounted CircuitPython microcontroller."""
+    target_dir = os.path.expanduser(volume_path)
+    if not os.path.exists(target_dir):
+        return f"Error: CircuitPython volume '{target_dir}' not found. Make sure the board is connected and mounted."
+    
+    target_file = os.path.join(target_dir, "code.py")
+    try:
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write(code_content)
+        # Flush macOS filesystem cache
+        os.sync()
+        return f"Successfully deployed {len(code_content)} bytes to {target_file}. Board will auto-reload."
+    except Exception as e:
+        return f"CircuitPython deploy failed: {str(e)}"
+
+def flash_esp32_binary(bin_path: str, port: str = "/dev/cu.wchusbserial5C941581161", offset: str = "0x10000", baudrate: int = 921600) -> str:
+    """Flash a compiled binary (.bin) to an ESP32 at a verified partition offset."""
+    expanded_bin = os.path.expanduser(bin_path)
+    if not os.path.exists(expanded_bin):
+        return f"Error: Binary file '{expanded_bin}' does not exist."
+    
+    # Safety guard: prevent accidental overwriting of bootloader or partition table
+    allowed_offsets = ["0x10000", "0x20000", "0x0"]
+    if offset not in allowed_offsets:
+        return f"Safety Refusal: Offset {offset} is unusual. Standard app offset is 0x10000."
+
+    cmd = [
+        "python3", "-m", "esptool",
+        "--chip", "esp32s3",
+        "--port", port,
+        "--baud", str(baudrate),
+        "write_flash",
+        "-z",
+        offset,
+        expanded_bin
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if res.returncode == 0:
+            return f"Flashing complete:\n{res.stdout[-400:]}"
+        return f"Flashing failed (Exit {res.returncode}):\n{res.stderr}"
+    except Exception as e:
+        return f"Flashing exception: {str(e)}"
+
+
 # ==========================================
 # 2. DISPATCH REGISTRY & SCHEMAS
 # ==========================================
@@ -331,6 +377,8 @@ TOOL_DISPATCHER = {
     "search_emails": search_emails,
     "delete_file": delete_file,
     "analyze_esp32_boot": analyze_esp32_boot,
+    "deploy_circuitpython_code": deploy_circuitpython_code,
+    "flash_esp32_binary": flash_esp32_binary,
     "list_dir": list_dir,
     "read_local_file": read_local_file,
     "write_local_file": write_local_file,
@@ -338,9 +386,43 @@ TOOL_DISPATCHER = {
     "list_serial_ports": list_serial_ports,
     "send_serial_command": send_serial_command,
     "search_codebase": search_codebase,
+    
+
 }
 
 TOOL_SCHEMAS = [
+        {
+        "type": "function",
+        "function": {
+            "name": "deploy_circuitpython_code",
+            "description": "Deploy Python code directly to an Adafruit or CircuitPython board by updating code.py on the mounted volume.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code_content": {"type": "string", "description": "Full CircuitPython script text."},
+                    "volume_path": {"type": "string", "description": "Mounted drive path, default '/Volumes/CIRCUITPY'."}
+                },
+                "required": ["code_content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "flash_esp32_binary",
+            "description": "Flash a pre-compiled Arduino/ESP-IDF .bin image onto an ESP32 using esptool at safe offsets.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bin_path": {"type": "string", "description": "Path to the .bin file on Mac."},
+                    "port": {"type": "string", "description": "Serial port of the ESP32."},
+                    "offset": {"type": "string", "description": "Hex address offset (default '0x10000')."}
+                },
+                "required": ["bin_path"],
+            },
+        },
+    },
+
     {
         "type": "function",
         "function": {
