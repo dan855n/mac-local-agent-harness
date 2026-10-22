@@ -3,6 +3,7 @@ import os
 import time
 import json
 import shutil
+import re
 import ollama
 import serial
 import serial.tools.list_ports
@@ -129,6 +130,47 @@ def delete_file(path: str) -> str:
         return f"Successfully deleted file: {clean_path}"
     except Exception as e:
         return f"Failed to delete '{clean_path}': {str(e)}"
+
+def analyze_esp32_boot(port: str = "/dev/cu.wchusbserial5C941581161", baudrate: int = 115200) -> str:
+    """Hardware reset an ESP32, capture bootloader logs, and extract firmware info."""
+    clean_port = port.replace("\\/", "/")
+    try:
+        with serial.Serial(clean_port, baudrate=baudrate, timeout=1) as ser:
+            ser.reset_input_buffer()
+            ser.setDTR(False)
+            ser.setRTS(True)
+            time.sleep(0.1)
+            ser.setRTS(False)
+
+            lines = []
+            start = time.time()
+            while time.time() - start < 4.0:
+                if ser.in_waiting:
+                    line = ser.readline().decode("utf-8", errors="replace").strip()
+                    if line:
+                        lines.append(line)
+
+            if not lines:
+                return "Device reset triggered, but no UART logs were received."
+
+            full_log = "\n".join(lines)
+
+            project = re.search(r"Project name:\s+(.+)", full_log)
+            idf_ver = re.search(r"ESP-IDF:\s+(.+)", full_log)
+            chip = re.search(r"chip revision:\s+(.+)", full_log)
+            ip_addr = re.search(r"sta ip:\s+([0-9.]+)", full_log)
+            display = re.search(r"([0-9]+x[0-9]+.+display.+)", full_log, re.IGNORECASE)
+
+            summary = [
+                f"Chip: ESP32-S3 ({chip.group(1) if chip else 'detected'})",
+                f"Project Name: {project.group(1) if project else 'Unknown'}",
+                f"IDF Version: {idf_ver.group(1) if idf_ver else 'Unknown'}",
+                f"Display/Sensors: {display.group(1) if display else 'No display logged'}",
+                f"Network IP: {ip_addr.group(1) if ip_addr else 'Not connected / No IP'}",
+            ]
+            return "\n".join(summary)
+    except Exception as e:
+        return f"ESP32 analysis failed: {str(e)}"
 
 def list_dir(path: str = ".") -> str:
     """List files and directories with sizes in a given path."""
@@ -288,6 +330,7 @@ TOOL_DISPATCHER = {
     "get_unread_emails": get_unread_emails,
     "search_emails": search_emails,
     "delete_file": delete_file,
+    "analyze_esp32_boot": analyze_esp32_boot,
     "list_dir": list_dir,
     "read_local_file": read_local_file,
     "write_local_file": write_local_file,
@@ -298,6 +341,19 @@ TOOL_DISPATCHER = {
 }
 
 TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_esp32_boot",
+            "description": "Trigger hardware reboot on ESP32, capture UART logs, and return parsed firmware name, display hardware, and network IP.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "port": {"type": "string", "description": "Serial port path, default '/dev/cu.wchusbserial5C941581161'."}
+                },
+            },
+        },
+    },
     {
         "type": "function",
         "function": {
