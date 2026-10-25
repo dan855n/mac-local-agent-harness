@@ -1,6 +1,6 @@
 # Mac Local Harness
 
-A modular, local-first Mac assistant that can use **Ollama**, **LM Studio**, or another OpenAI-compatible chat endpoint. It includes a desktop-style local web GUI and a terminal interface. Inference goes to the configured model server. The tool set is built for practical Mac work, software projects, web research, local files, Mail.app, Android ADB, serial devices, and CircuitPython/ESP32 boards.
+A modular, local-first Mac assistant that can use **Ollama**, **LM Studio**, or another OpenAI-compatible chat endpoint. It includes a desktop-style local web GUI and a terminal interface. Inference goes to the configured model server. The tool set is built for practical Mac work, software projects, web research, local files, Mail.app, Android ADB, serial devices, CircuitPython/ESP32 boards, and FilmCraft video editing through its local MCP server.
 
 ## Install on macOS
 
@@ -37,7 +37,10 @@ LM Studio has native Python tooling too, but the harness uses the shared OpenAI-
 | Web | DuckDuckGo search and public webpage text retrieval |
 | Mail | Search recent Mail.app inbox messages by sender/subject; read-only |
 | Hardware | Serial port list/read/send, ESP32-S3 reset/boot capture, allowlisted ADB diagnostics, CircuitPython deploy, ESP32-S3 app flashing |
+| Video | Inspect FilmCraft projects and sequences; import media, run FilmCraft commands, and batch edits through local MCP |
 | Sessions | SQLite conversation history, resume/list/delete/export, provider and model switching, JSONL action audit |
+
+FilmCraft support uses the CLI at `~/filmcraft/filmcraft-cli` by default; change `filmcraft_cli_path` in `~/Library/Application Support/MacLocalHarness/config.toml` if you stored it elsewhere. Use `filmcraft_inspect` to inspect an existing `.fcproj`. `filmcraft_edit` asks for approval and saves the project after each edit; its MCP process runs as your Mac user and can access files that user can access. The FilmCraft MCP server does not provide folder confinement, so use a dedicated project and review any proposed imports, edits, or exports.
 
 The tool registry is modular: add a Python file under `src/mac_harness/tools/`, register a function with its JSON parameter schema and risk level, then import the module from `tools/__init__.py`.
 

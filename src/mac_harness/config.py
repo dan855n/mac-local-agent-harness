@@ -28,6 +28,7 @@ allow_sensitive_paths = false
 allow_terminal_commands = true
 # Optional maximum captured command output.
 command_timeout_seconds = 90
+filmcraft_cli_path = "~/filmcraft/filmcraft-cli"
 
 [tool_groups]
 files = true
@@ -36,6 +37,7 @@ web = true
 developer = true
 mail = true
 hardware = true
+filmcraft = true
 '''
 
 @dataclass
@@ -52,8 +54,9 @@ class Settings:
     allow_sensitive_paths: bool = False
     allow_terminal_commands: bool = True
     command_timeout_seconds: int = 90
+    filmcraft_cli_path: str = "~/filmcraft/filmcraft-cli"
     tool_groups: dict[str, bool] = field(default_factory=lambda: {
-        "files": True, "mac": True, "web": True, "developer": True, "mail": True, "hardware": True
+        "files": True, "mac": True, "web": True, "developer": True, "mail": True, "hardware": True, "filmcraft": True
     })
 
     @classmethod
